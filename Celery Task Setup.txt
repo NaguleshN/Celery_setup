@@ -1,0 +1,68 @@
+Celery Task Setup
+
+run: 
+worker: celery -A DigitalCapsule worker --pool=solo -l info
+beat: celery -A DigitalCapsule beat -l info
+
+settings.py
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
+CELERY_BEAT_SCHEDULER='django_celery_beat.schedulers:DatabaseScheduler'
+
+
+INSTALLED_APPS = [
+'django_celery_beat',
+]
+
+
+project/__init__.py:
+
+from .celery import app as celery_app
+
+__all__ = ("celery_app",)
+
+
+project/celery.py:
+
+from __future__ import absolute_import, unicode_literals
+import os
+from celery import Celery
+
+# Set the default Django settings module for the 'celery' program.
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'DigitalCapsule.settings')
+
+app = Celery('DigitalCapsule')
+
+# Using a string here means the worker doesn't have to serialize
+# the configuration object to child processes.
+app.config_from_object('django.conf:settings', namespace='CELERY')
+
+# Discover tasks in installed apps
+app.autodiscover_tasks()
+
+@app.task(bind=True)
+def debug_task(self):
+    print(f'Request: {self.request!r}')
+
+
+app/tasks.py:
+
+from celery import shared_task
+from datetime import datetime
+import requests
+
+@shared_task
+def send_browser_notification():
+    print("hello guys")
+
+views.py:
+from .tasks import *
+send_browser_notification.delay()
